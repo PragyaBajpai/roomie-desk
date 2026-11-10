@@ -1,51 +1,81 @@
-# Roomie Desk — 5-minute pitch script
+# Roomie Desk: 5-minute pitch script
 
-Target: 4:30. Timings are cumulative. Numbers marked *assumption* are not validated market data — say so on camera.
+The brief's format is 5 sections and 5:00 maximum; longer videos aren't watched. **Aim for 4:40.** Words in *italics* are what you say. Numbers marked *(assumption)* are not validated: say "we estimate" on camera.
+
+| # | Section | Time | Ends at |
+|---|---|---|---|
+| 1 | Who you are | 0:40 | 0:40 |
+| 2 | Your best work | 0:25 | 1:05 |
+| 3 | Why this business will win | 0:55 | 2:00 |
+| 4 | Demo | 2:00 | 4:00 |
+| 5 | The money | 0:40 | 4:40 |
 
 ---
 
-## 0:00 – 0:30 · Who I am
-- Your name, background, and one line on why this problem: e.g. "I've seen friends spend weeks finding a flatmate through WhatsApp groups, and the agencies in the middle are drowning in the same chaos."
-- "In the next five minutes: the problem, the product, a live demo, and the economics."
+## 1 · Who you are (0:40)
 
-## 0:30 – 1:15 · The problem
-- Small flatmate-matching agencies and co-living operators in cities like Pune and Bengaluru run on **WhatsApp + spreadsheets + phone calls**.
-- Every enquiry means re-typing the same details (budget, area, move-in date, food, lifestyle), scrolling a sheet to find compatible people, and forgetting who was sent to whom.
-- The cost: slow replies lose the lead; inconsistent matching produces bad pairings; nothing is measurable.
-- These operators won't adopt a heavy CRM. They already live in a chat window.
+*"Hi, I'm Pragya. I'm a product manager with six years in tech: three in product, and before that, engineering in Python, Django and REST APIs.*
 
-## 1:15 – 1:45 · The product
-- **Roomie Desk**: one workflow done well — *enquiry → matches → shortlist → saved*.
-- The operator talks to Claude like they'd talk to an assistant; Claude calls Roomie Desk's MCP server, which does the real work in a real database.
-- The split is deliberate: **Claude handles language, the app handles truth** — storage, a deterministic, explainable score (budget 30, location 25, move-in 20, food 10, lifestyle 15), and editing. No AI key in the product, no black-box scores.
+*Today I'm an Associate Project Manager for AI products at Partex.ai, where I own end-to-end delivery of an enterprise client's AI product: PRDs, LLM workflows, output validation, UAT and releases. Before that I was at Linarc, building enterprise B2B SaaS for construction.*
 
-## 1:45 – 3:45 · Live demo (screen recording)
-Have Claude open with the Roomie Desk connector enabled, and the app logged in on a second tab.
+*So I sit right where this assignment sits: business workflows, integrations, and AI that has to work in production. This is Roomie Desk."*
 
-1. **Claude** — paste: *"I have a new enquiry from Neha Kapoor, a female working professional looking for a flatmate in Hinjewadi Phase 1, Pune. Her budget is ₹12,000, she prefers vegetarian food and wants to move in by December 1. Create the enquiry and find her the best three matches."*
-   - Point out the tool calls (`create_enquiry`, `search_flatmates`) and the per-criterion reasons. Mention profiles are fictional demo data.
-2. **Claude** — *"Shortlist all three and note 'Share profiles on WhatsApp today'."* (`shortlist_flatmate`)
-3. **App** — refresh the Dashboard: new enquiry with the **via Claude** badge, activity feed shows Claude's actions.
-4. **App** — open the enquiry: the three shortlisted profiles with stored scores. Change the budget to ₹13,000, add a lifestyle tag, set status to *Contacted*, **Save**. **Refresh the page** — it persisted.
-5. **App** — Matching workspace: show the score breakdown bars; shortlist one more by hand.
-6. **Claude** — *"What's on Neha's shortlist now and what's her budget?"* → Claude reads back the human's edit. That closes the loop: Claude → MCP → database → human edit → Claude sees it.
+## 2 · Your best work (0:25)
 
-## 3:45 – 4:30 · Business economics (*assumptions*)
-- **Pricing (proposed):** Free (limited enquiries) · Starter ₹499/month · Pro ₹999/month.
-- **Unit economics:** single shared Next.js + Postgres deployment; marginal hosting cost per customer is a few rupees a month at small scale → gross margin comfortably above 90% (*assumption*). No AI inference cost on our side — the customer brings their own Claude.
-- **Value anchor:** one placement fee for an agency is typically worth more than a year of Pro (*assumption — validate in interviews*). Saving even one lost lead a month pays for it.
-- **Go-to-market:** founder-led sales to agencies already visible on Facebook/WhatsApp groups and NoBroker-style listings in Pune and Bengaluru; then co-living operators with 20–200 beds.
-- **Next metrics to validate:** time-to-first-reply per enquiry, enquiry → shortlist conversion, weekly active operators.
+Pick one. The brief asks for **numbers or proof**, so fill in the bracket with a real figure before recording.
 
-## 4:30 – 5:00 · Why it wins
-- Meets operators where they already work — a chat box — instead of asking them to learn a CRM.
-- Explainable, deterministic matching they can trust and defend to a customer.
-- Every action becomes structured data, so the business finally gets a pipeline.
-- Close: "Roomie Desk — find your space, find your people. Thank you."
+*"The thing I'm proudest of: at Linarc I led Schedule of Values, the billing backbone for construction projects, along with the DocuSign and QuickBooks integrations around it. Contractors went from spreadsheets and re-keying to sign-and-sync inside the product. **[Add proof: e.g. "used by N customers", "cut billing prep from X days to Y", "N contracts signed in the first quarter"].**"*
+
+## 3 · Why this business will win (0:55)
+
+**Who it's for.** *"Independent flatmate-matching agencies and small co-living operators: the people placing IT professionals and students in Pune, Bengaluru and Hyderabad."*
+
+**The problem.** *"They run on WhatsApp and spreadsheets. Every enquiry means re-typing budget, area, move-in date and food preferences, scrolling a sheet for compatible people, and forgetting who was sent to whom. Slow replies lose the lead."*
+
+**Why an app, and not just Claude.** *"Claude is brilliant at understanding a messy WhatsApp enquiry, but on its own it can't run the business:*
+- *It has no shared, permanent record: the agency's staff all need the same pipeline, tomorrow and next month.*
+- *The customer doesn't use the agency's Claude. Roomie Desk gives the customer a private link to see their matches and accept. That keeps working after the chat ends.*
+- *Matching has to be consistent and defensible, so Roomie Desk scores it with fixed rules: budget, location, move-in date, food and lifestyle, with a reason for every point. No AI inside.*
+
+*Claude does the thinking and writing. Roomie Desk keeps the records, does the maths, and serves the customer."*
+
+## 4 · Demo (2:00)
+
+**Before you hit record**
+- Log in to Roomie Desk → sidebar → **Reset demo data** (clean slate; Neha will be enquiry #4).
+- New Claude chat with the **Roomie Desk** connector switched on. Run one throwaway prompt first ("list Riya Sharma's enquiry") so any tool-permission prompts are already approved.
+- Tabs ready: Claude | Roomie Desk dashboard | a private/incognito window (or your phone) for the customer link.
+- Browser zoom 110–125%.
+
+| Time | Do | Say |
+|---|---|---|
+| 0:00 | Paste in Claude: **"I have a new enquiry from Neha Kapoor, a female working professional looking for a flatmate in Hinjewadi Phase 1, Pune. Her budget is ₹12,000, she prefers vegetarian food and wants to move in by December 1. Create the enquiry and find her the best three matches."** | *"This is exactly how an agency owner would type it."* |
+| 0:15 | Point at the tool calls `create_enquiry` → `search_flatmates`, then the three matches. | *"Claude created a real enquiry in my database and searched it. The scores come from Roomie Desk, not from Claude, and each one has a reason. These are fictional demo profiles."* |
+| 0:35 | Type: **"Shortlist all three and add the note 'Share profiles on WhatsApp today'."** | *"Saved."* |
+| 0:45 | Switch to the dashboard and refresh. | *"Here's Neha: created via Claude, three shortlisted, and the activity feed shows exactly what Claude did."* |
+| 1:00 | Open Neha. Change budget to **13,000**, tick **quiet**, status **Contacted**, **Save changes**. Then **refresh the page**. | *"A person can correct anything Claude did. Saved, refreshed, still there: it's in Postgres."* |
+| 1:25 | Copy the **Customer link**, open it in the private window or on your phone. Click **Accept Priya**. | *"This is what Neha sees: no login, only her own matches. She accepts Priya herself."* |
+| 1:40 | Back to admin, refresh: **Accepted by customer**, enquiry **Matched**. Open **Matching** for Riya: Priya is gone. | *"The agency sees who decided, and Priya is off the market for everyone else."* |
+| 1:50 | In Claude: **"What's Neha's status and budget now?"** | *"And Claude sees my manual edit and Neha's decision. Claude, the app, the agency and the customer, all on one record."* |
+
+## 5 · The money (0:40)
+
+**Cost to run, per customer.** *"Roomie Desk has no AI bill: the agency's own Claude plan does the AI work. My only cost is hosting: one shared app and database. On paid tiers that's about ₹3,500 a month in total, so at 100 agencies it's roughly ₹35 per customer per month. (assumption)"*
+
+**What we charge.** *"Free for up to 20 enquiries a month. Starter at ₹499 and Pro at ₹999 a month for unlimited enquiries and team seats. That's over 95% gross margin, and one placement fee usually covers a year of Pro. (assumption)"*
+
+**First 100 customers.** *"These agencies are easy to find: they advertise in Facebook flatmate groups, on NoBroker, OLX and Instagram, around Pune and Bengaluru's IT parks. I'd personally onboard the first 20, offer free setup, then grow through referrals and broker WhatsApp communities. About six months to 100. (assumption)"*
+
+**1 year / 3 years.** *"In a year: around 300 paying agencies in 3 cities, about ₹30 lakh ARR, adding viewing scheduling and WhatsApp-sent links. In three years: 10 cities and around 3,000 agencies, and then the bigger prize: collecting deposits and rent through the platform, taking a small cut of the money that already flows through every placement. (assumption)"*
+
+*"Roomie Desk: find your space, find your people. Thank you."*
 
 ---
 
 ### Recording checklist
-- Log in beforehand; have the connector enabled in a fresh Claude chat.
-- Zoom browser to 110–125% so text is legible.
-- If a tool call asks for permission, click "Allow" — it shows the integration is real.
+- [ ] Filled in the number in section 2
+- [ ] Reset demo data right before recording
+- [ ] Throwaway prompt run, so tool permissions are already approved
+- [ ] One full dry run with a timer: under 4:50
+- [ ] After recording: **Reset demo data** again, so reviewers start clean
+- [ ] Upload (YouTube unlisted / Loom / Google Drive "anyone with link") and test the link in a private window
