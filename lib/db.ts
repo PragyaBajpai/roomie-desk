@@ -16,6 +16,7 @@ function makePool() {
     ssl: isLocal ? undefined : { rejectUnauthorized: false },
     max: 5,
     idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
   });
 }
 
@@ -36,22 +37,23 @@ export function ensureReady(): Promise<void> {
 }
 
 async function migrateAndSeed() {
+  // One transaction with a transaction-scoped lock: safe behind PgBouncer-style
+  // poolers (Neon), where session-level advisory locks can leak.
   const client = await pool().connect();
   try {
-    await client.query("SELECT pg_advisory_lock(424242)");
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(424242)");
     await client.query(SCHEMA_SQL);
     const { rows } = await client.query("SELECT value FROM app_meta WHERE key = 'seeded'");
     if (rows.length === 0) {
-      await client.query("BEGIN");
       await seed(client);
       await client.query("INSERT INTO app_meta (key, value) VALUES ('seeded', now()::text)");
-      await client.query("COMMIT");
     }
+    await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
   } finally {
-    await client.query("SELECT pg_advisory_unlock(424242)").catch(() => {});
     client.release();
   }
 }
