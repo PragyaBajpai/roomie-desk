@@ -24,6 +24,7 @@ export function ShortlistEntryEditor({ enquiryId, flatmateId, status, note }: { 
         <button className="btn-outline btn-sm" disabled={pending}>{pending ? "Saving…" : saved ? "✓ Saved" : "Save"}</button>
       </form>
       {state.error && <p className="text-[12px] text-brand-700">{state.error}</p>}
+      {status !== "accepted" && <p className="text-[11.5px] text-ink-400">Set to <b>Accepted</b> to match them — they&apos;ll be removed from other enquiries&apos; matches.</p>}
       <form action={unshortlistAction}>
         <input type="hidden" name="enquiry_id" value={enquiryId} />
         <input type="hidden" name="flatmate_id" value={flatmateId} />

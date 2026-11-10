@@ -84,13 +84,20 @@ export async function updateEnquiry(id: number, patch: unknown, source: Source) 
   return e!;
 }
 
-export async function updateEnquiryStatus(id: number, status: string, source: Source, note?: string) {
+export async function updateEnquiryStatus(id: number, status: string, source: Source, note?: string, matchedFlatmateId?: number) {
   if (!(ENQUIRY_STATUS as readonly string[]).includes(status)) throw new AppError(`status must be one of: ${ENQUIRY_STATUS.join(", ")}`);
+  if (matchedFlatmateId && status !== "matched") throw new AppError("matched_flatmate_id can only be used with status 'matched'");
   const e = await getEnquiry(id);
+  if (matchedFlatmateId) {
+    // Put them on the shortlist if needed, then accept — this takes them out of the matching pool.
+    await shortlistFlatmates(id, [matchedFlatmateId], source);
+    await acceptShortlisted(id, matchedFlatmateId, source);
+  }
+  if (e.status === "matched" && status !== "matched") await releaseAccepted(id, source);
   const updated = await q1<Enquiry>(
     `UPDATE enquiries SET status = $2, notes = CASE WHEN $3::text <> '' THEN trim(notes || E'\\n' || $3) ELSE notes END, updated_at = now() WHERE id = $1 RETURNING *`,
     [id, status, note ?? ""]);
-  await log(`${e.customer_name}'s enquiry moved to “${status}”${note ? ` — ${note}` : ""}`, source, id);
+  if (e.status !== status) await log(`${e.customer_name}'s enquiry moved to “${status}”${note ? ` — ${note}` : ""}`, source, id);
   return updated!;
 }
 
@@ -119,14 +126,14 @@ export async function matchesForEnquiry(id: number, limit = 10) {
 export type ShortlistRow = {
   id: number; enquiry_id: number; flatmate_id: number; score: number; reason: string; note: string; status: string; source: string;
   created_at: Date; name: string; occupation: string; gender: string; locality: string; city: string; budget_min: number;
-  budget_max: number; move_in_date: string; food: string; lifestyle: string[]; is_demo: boolean;
+  budget_max: number; move_in_date: string; food: string; lifestyle: string[]; is_demo: boolean; flatmate_status: string;
 };
 
 export async function getShortlist(enquiryId: number) {
   await getEnquiry(enquiryId);
   return q<ShortlistRow>(
-    `SELECT s.*, f.name, f.occupation, f.gender, f.locality, f.city, f.budget_min, f.budget_max, f.move_in_date, f.food, f.lifestyle, f.is_demo
-     FROM shortlists s JOIN flatmates f ON f.id = s.flatmate_id WHERE s.enquiry_id = $1 ORDER BY s.score DESC, s.id`, [enquiryId]);
+    `SELECT s.*, f.name, f.occupation, f.gender, f.locality, f.city, f.budget_min, f.budget_max, f.move_in_date, f.food, f.lifestyle, f.is_demo, f.status AS flatmate_status
+     FROM shortlists s JOIN flatmates f ON f.id = s.flatmate_id WHERE s.enquiry_id = $1 ORDER BY (s.status = 'accepted') DESC, s.score DESC, s.id`, [enquiryId]);
 }
 
 export async function shortlistFlatmates(enquiryId: number, flatmateIds: number[], source: Source, note = "") {
@@ -136,6 +143,10 @@ export async function shortlistFlatmates(enquiryId: number, flatmateIds: number[
   const out: { flatmate_id: number; name: string; score: number; reason: string; already_shortlisted: boolean }[] = [];
   for (const fid of Array.from(new Set(flatmateIds))) {
     const f = await getFlatmate(fid);
+    if (f.status !== "active") {
+      const own = await q1("SELECT 1 FROM shortlists WHERE enquiry_id = $1 AND flatmate_id = $2", [enquiryId, fid]);
+      if (!own) throw new AppError(`${f.name} is no longer available (status: ${f.status}) — already matched with another enquiry`);
+    }
     const m = scoreFlatmate(f, c);
     const r = await q1<{ inserted: boolean }>(
       `INSERT INTO shortlists (enquiry_id, flatmate_id, score, reason, note, source) VALUES ($1,$2,$3,$4,$5,$6)
@@ -152,22 +163,71 @@ export async function shortlistFlatmates(enquiryId: number, flatmateIds: number[
 }
 
 export async function removeFromShortlist(enquiryId: number, flatmateId: number, source: Source) {
-  const r = await q1<{ name: string }>(
-    `DELETE FROM shortlists s USING flatmates f WHERE s.enquiry_id = $1 AND s.flatmate_id = $2 AND f.id = s.flatmate_id RETURNING f.name`,
+  const r = await q1<{ name: string; status: string }>(
+    `DELETE FROM shortlists s USING flatmates f WHERE s.enquiry_id = $1 AND s.flatmate_id = $2 AND f.id = s.flatmate_id RETURNING f.name, s.status`,
     [enquiryId, flatmateId]);
   if (!r) throw new AppError("That profile is not on this shortlist", "not_found");
   await log(`${r.name} removed from enquiry #${enquiryId}'s shortlist`, source, enquiryId);
+  if (r.status === "accepted") await releaseFlatmate(flatmateId, enquiryId, source, r.name);
 }
 
 export async function updateShortlistEntry(enquiryId: number, flatmateId: number, patch: { status?: string; note?: string }, source: Source) {
   if (patch.status && !(SHORTLIST_STATUS as readonly string[]).includes(patch.status)) throw new AppError(`status must be one of: ${SHORTLIST_STATUS.join(", ")}`);
-  const r = await q1<{ name: string }>(
-    `UPDATE shortlists s SET status = COALESCE($3, s.status), note = COALESCE($4, s.note), updated_at = now()
-     FROM flatmates f WHERE s.enquiry_id = $1 AND s.flatmate_id = $2 AND f.id = s.flatmate_id RETURNING f.name`,
-    [enquiryId, flatmateId, patch.status ?? null, patch.note ?? null]);
-  if (!r) throw new AppError("That profile is not on this shortlist", "not_found");
+  const prev = await q1<{ status: string; name: string }>(
+    "SELECT s.status, f.name FROM shortlists s JOIN flatmates f ON f.id = s.flatmate_id WHERE s.enquiry_id = $1 AND s.flatmate_id = $2", [enquiryId, flatmateId]);
+  if (!prev) throw new AppError("That profile is not on this shortlist", "not_found");
+  if (patch.note !== undefined) await q("UPDATE shortlists SET note = $3, updated_at = now() WHERE enquiry_id = $1 AND flatmate_id = $2", [enquiryId, flatmateId, patch.note]);
+  if (patch.status && patch.status !== prev.status) {
+    if (patch.status === "accepted") {
+      await acceptShortlisted(enquiryId, flatmateId, source);
+      return;
+    }
+    await q("UPDATE shortlists SET status = $3, updated_at = now() WHERE enquiry_id = $1 AND flatmate_id = $2", [enquiryId, flatmateId, patch.status]);
+    if (prev.status === "accepted") await releaseFlatmate(flatmateId, enquiryId, source, prev.name);
+  }
   await q("UPDATE enquiries SET updated_at = now() WHERE id = $1", [enquiryId]);
-  await log(`Shortlist: ${r.name}${patch.status ? ` → ${patch.status}` : ""}${patch.note ? " (note updated)" : ""}`, source, enquiryId);
+  if (patch.status && patch.status !== prev.status) await log(`Shortlist: ${prev.name} → ${patch.status}`, source, enquiryId);
+  else if (patch.note !== undefined) await log(`Shortlist note updated for ${prev.name}`, source, enquiryId);
+}
+
+/** Accept a shortlisted flatmate: enquiry → matched, flatmate → matched (leaves the pool for every other enquiry). */
+async function acceptShortlisted(enquiryId: number, flatmateId: number, source: Source) {
+  const f = await getFlatmate(flatmateId);
+  const e = await getEnquiry(enquiryId);
+  const elsewhere = await q1<{ customer_name: string }>(
+    `SELECT e.customer_name FROM shortlists s JOIN enquiries e ON e.id = s.enquiry_id
+     WHERE s.flatmate_id = $1 AND s.status = 'accepted' AND s.enquiry_id <> $2 LIMIT 1`, [flatmateId, enquiryId]);
+  if (elsewhere) throw new AppError(`${f.name} is already matched with ${elsewhere.customer_name}`);
+  await q("UPDATE shortlists SET status = 'accepted', updated_at = now() WHERE enquiry_id = $1 AND flatmate_id = $2", [enquiryId, flatmateId]);
+  await q("UPDATE flatmates SET status = 'matched', updated_at = now() WHERE id = $1", [flatmateId]);
+  await q("UPDATE enquiries SET status = 'matched', updated_at = now() WHERE id = $1", [enquiryId]);
+  await log(`${e.customer_name} matched with ${f.name} — ${f.name} removed from the matching pool`, source, enquiryId);
+}
+
+async function releaseFlatmate(flatmateId: number, enquiryId: number, source: Source, name: string) {
+  const still = await q1("SELECT 1 FROM shortlists WHERE flatmate_id = $1 AND status = 'accepted'", [flatmateId]);
+  if (still) return;
+  await q("UPDATE flatmates SET status = 'active', updated_at = now() WHERE id = $1 AND status = 'matched'", [flatmateId]);
+  await log(`${name} is available for matching again`, source, enquiryId);
+}
+
+async function releaseAccepted(enquiryId: number, source: Source) {
+  const rows = await q<{ flatmate_id: number; name: string }>(
+    `UPDATE shortlists s SET status = 'shortlisted', updated_at = now() FROM flatmates f
+     WHERE s.enquiry_id = $1 AND s.status = 'accepted' AND f.id = s.flatmate_id RETURNING s.flatmate_id, f.name`, [enquiryId]);
+  for (const r of rows) await releaseFlatmate(r.flatmate_id, enquiryId, source, r.name);
+}
+
+/** Open enquiries (other than `excludeEnquiryId`) each flatmate is currently shortlisted for. */
+export async function otherShortlists(flatmateIds: number[], excludeEnquiryId?: number) {
+  if (!flatmateIds.length) return new Map<number, { enquiry_id: number; customer_name: string }[]>();
+  const rows = await q<{ flatmate_id: number; enquiry_id: number; customer_name: string }>(
+    `SELECT s.flatmate_id, e.id AS enquiry_id, e.customer_name FROM shortlists s JOIN enquiries e ON e.id = s.enquiry_id
+     WHERE s.flatmate_id = ANY($1::int[]) AND e.id <> $2 AND e.status NOT IN ('closed') AND s.status <> 'declined'
+     ORDER BY e.updated_at DESC`, [flatmateIds, excludeEnquiryId ?? 0]);
+  const map = new Map<number, { enquiry_id: number; customer_name: string }[]>();
+  for (const r of rows) map.set(r.flatmate_id, [...(map.get(r.flatmate_id) ?? []), { enquiry_id: r.enquiry_id, customer_name: r.customer_name }]);
+  return map;
 }
 
 async function rescoreShortlist(e: Enquiry) {

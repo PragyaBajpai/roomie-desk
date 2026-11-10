@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { countActiveFlatmates, getShortlist, listEnquiries, matchesForEnquiry } from "@/lib/repo";
+import { countActiveFlatmates, getShortlist, listEnquiries, matchesForEnquiry, otherShortlists } from "@/lib/repo";
 import { Avatar, DemoBadge, PageHeader, ScoreRing, StatusBadge, budgetText, dateText, inr } from "@/components/ui";
 import { shortlistAction, unshortlistAction } from "@/app/actions";
 import { WEIGHTS } from "@/lib/matching";
@@ -17,6 +17,8 @@ export default async function MatchingPage({ searchParams }: { searchParams: Pro
 
   const [{ enquiry, matches }, shortlist, pool] = await Promise.all([matchesForEnquiry(selectedId, 30), getShortlist(selectedId), countActiveFlatmates()]);
   const shortlisted = new Set(shortlist.map((s) => s.flatmate_id));
+  const overlap = await otherShortlists(matches.map((m) => m.flatmate.id), selectedId);
+  const acceptedHere = shortlist.find((s) => s.status === "accepted");
   const visible = showAll ? matches : matches.filter((m) => m.match.score >= 50).slice(0, 8);
   const criteria = [
     ["Location", [enquiry.locality, enquiry.city].filter(Boolean).join(", ") || "Any"],
@@ -29,7 +31,7 @@ export default async function MatchingPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Matching workspace" subtitle={`Ranked from ${pool} active profiles with a deterministic score — budget ${WEIGHTS.budget}, location ${WEIGHTS.location}, move-in ${WEIGHTS.move_in}, food ${WEIGHTS.food}, lifestyle ${WEIGHTS.lifestyle}.`} />
+      <PageHeader title="Matching workspace" subtitle={`Ranked from ${pool} available profiles with a deterministic score — budget ${WEIGHTS.budget}, location ${WEIGHTS.location}, move-in ${WEIGHTS.move_in}, food ${WEIGHTS.food}, lifestyle ${WEIGHTS.lifestyle}.`} />
 
       <div className="grid lg:grid-cols-[260px_1fr] gap-5 items-start">
         <aside className="card p-2 lg:sticky lg:top-6">
@@ -62,6 +64,12 @@ export default async function MatchingPage({ searchParams }: { searchParams: Pro
             </dl>
           </section>
 
+          {acceptedHere && (
+            <div className="card px-5 py-3.5 text-[13px] text-sage-700 bg-sage-50 border-sage-500/20">
+              ✓ {enquiry.customer_name} is matched with <b>{acceptedHere.name}</b>. Matched profiles are removed from everyone else&apos;s results.
+            </div>
+          )}
+
           <div className="flex items-center justify-between px-1">
             <p className="text-[12.5px] text-ink-500">{visible.length} {showAll ? "profiles" : "best matches"} · demo profiles are fictional</p>
             <Link href={`/matching?enquiry=${selectedId}${showAll ? "" : "&all=1"}`} className="text-[12.5px] text-ink-500 hover:text-ink-950">{showAll ? "Show best matches" : "Show all eligible"}</Link>
@@ -81,6 +89,11 @@ export default async function MatchingPage({ searchParams }: { searchParams: Pro
                       <h3 className="text-[15px] font-semibold">{f.name}</h3>
                       {f.is_demo && <DemoBadge />}
                       {m.meets_all_criteria && <span className="chip bg-sage-50 text-sage-700">Meets all criteria</span>}
+                      {(overlap.get(f.id) ?? []).slice(0, 2).map((o) => (
+                        <Link key={o.enquiry_id} href={`/enquiries/${o.enquiry_id}`} className="chip bg-sky-50 text-sky-700 hover:underline" title="This profile is on another enquiry's shortlist">
+                          Also shortlisted for {o.customer_name}
+                        </Link>
+                      ))}
                     </div>
                     <p className="text-[12.5px] text-ink-500 mt-0.5">{f.occupation} · {f.locality}, {f.city} · {inr(f.budget_min)}–{inr(f.budget_max)} · from {dateText(f.move_in_date)}</p>
                     <p className="text-[13px] text-ink-700 mt-2 leading-relaxed">{f.intro}</p>

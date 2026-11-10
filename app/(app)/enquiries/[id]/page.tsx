@@ -35,7 +35,7 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div className="grid xl:grid-cols-[1fr_380px] gap-5 items-start">
-        <EnquiryForm enquiry={enquiry} action={saveEnquiryAction} submitLabel="Save changes" />
+        <EnquiryForm key={enquiry.status} enquiry={enquiry} action={saveEnquiryAction} submitLabel="Save changes" />
 
         <section className="card">
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line">
@@ -50,7 +50,7 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
           )}
           <ul>
             {shortlist.map((s) => (
-              <li key={s.id} className="px-5 py-4 border-b border-line last:border-0">
+              <li key={s.id} className={`px-5 py-4 border-b border-line last:border-0 ${s.status === "accepted" ? "bg-sage-50/60" : ""}`}>
                 <div className="flex gap-3">
                   <Avatar name={s.name} />
                   <div className="flex-1 min-w-0">
@@ -58,6 +58,8 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
                       <p className="font-medium text-ink-950">{s.name}</p>
                       {s.is_demo && <DemoBadge />}
                       {s.source === "claude" && <SourceBadge source="claude" />}
+                      {s.status === "accepted" && <span className="chip bg-sage-50 text-sage-700">Matched</span>}
+                      {s.status !== "accepted" && s.flatmate_status === "matched" && <span className="chip bg-ink-950/5 text-ink-500" title="Accepted by another enquiry">Matched elsewhere</span>}
                     </div>
                     <p className="text-[12px] text-ink-500">{s.occupation} · {s.locality}</p>
                   </div>

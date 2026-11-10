@@ -34,6 +34,9 @@ The owner can run that whole loop by talking to Claude (through a remote MCP ser
 
 Every result carries a plain-English reason per criterion, which is what Claude reads back to the user.
 
+### Matched profiles leave the pool
+A shortlist doesn't reserve anyone — the same profile can be sent to several seekers, and match cards show **"Also shortlisted for …"** so you can see the overlap. When a customer agrees, set that shortlist entry to **Accepted** (or tell Claude "mark Neha as matched with Priya"): the enquiry becomes *matched*, the flatmate becomes *matched*, and they disappear from every other enquiry's results and can't be shortlisted elsewhere. Moving the entry or the enquiry back releases them.
+
 ### MCP server
 Official `@modelcontextprotocol/sdk`, **Streamable HTTP** (stateless, JSON responses) at `/api/mcp/<MCP_ACCESS_KEY>`.
 
@@ -46,7 +49,7 @@ Official `@modelcontextprotocol/sdk`, **Streamable HTTP** (stateless, JSON respo
 | `get_flatmate_details` | SELECT profile (+ score breakdown against an enquiry) |
 | `shortlist_flatmate` | UPSERT shortlist rows with stored score + reason; enquiry → "shortlisted" |
 | `get_shortlisted_flatmates` | SELECT shortlist with scores, reasons, notes, status |
-| `update_enquiry_status` | UPDATE status (new → matching → shortlisted → contacted → matched → closed) + note |
+| `update_enquiry_status` | UPDATE status (new → matching → shortlisted → contacted → matched → closed) + note. With `matched_flatmate_id`, accepts that flatmate and takes them out of the pool. |
 
 Inputs are validated with zod (schemas exposed to Claude); errors come back as `isError` results with a readable message; every write is logged to the activity feed with `source = claude`.
 

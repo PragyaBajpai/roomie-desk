@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
-  AppError, createEnquiry, enquiryCriteria, getEnquiry, getFlatmate, getShortlist, searchFlatmates,
+  AppError, createEnquiry, enquiryCriteria, getEnquiry, getFlatmate, getShortlist, otherShortlists, searchFlatmates,
   shortlistFlatmates, updateEnquiry, updateEnquiryStatus, type Enquiry,
 } from "./repo";
 import { scoreFlatmate, type Flatmate } from "./matching";
@@ -68,6 +68,7 @@ function flatmateView(f: Flatmate) {
     work_schedule: f.work_schedule,
     lifestyle: f.lifestyle,
     intro: f.intro,
+    availability: f.status === "active" ? "available" : f.status === "matched" ? "matched (no longer available)" : "inactive",
   };
 }
 
@@ -96,7 +97,7 @@ export function buildMcpServer(baseUrl: string) {
     { name: "roomie-desk", version: "1.0.0" },
     {
       instructions:
-        "Roomie Desk is the enquiry and flatmate-matching back office of a co-living agency. Typical flow: create_enquiry → search_flatmates (pass enquiry_id) → present the top matches with their score breakdown → shortlist_flatmate. All flatmate profiles in this workspace are fictional demo data; say so when presenting them. Scores are deterministic (budget 30, location 25, move-in 20, food 10, lifestyle 15).",
+        "Roomie Desk is the enquiry and flatmate-matching back office of a co-living agency. Typical flow: create_enquiry → search_flatmates (pass enquiry_id) → present the top matches with their score breakdown → shortlist_flatmate. When the customer agrees to a flatmate, call update_enquiry_status with status 'matched' and matched_flatmate_id — that removes the flatmate from everyone else's results. All flatmate profiles in this workspace are fictional demo data; say so when presenting them. Scores are deterministic (budget 30, location 25, move-in 20, food 10, lifestyle 15).",
     },
   );
 
@@ -177,6 +178,7 @@ export function buildMcpServer(baseUrl: string) {
         criteria = { ...direct, seekerGender: seeker_gender ?? null };
       }
       const results = await searchFlatmates(criteria, { strict, limit });
+      const overlap = await otherShortlists(results.map((r) => r.flatmate.id), enquiry_id);
       return {
         criteria_used: criteria,
         enquiry,
@@ -186,7 +188,9 @@ export function buildMcpServer(baseUrl: string) {
           compatibility_score: match.score,
           meets_all_criteria: match.meets_all_criteria,
           why: match.breakdown.map((b) => `${b.label} ${b.points}/${b.weight}: ${b.detail}`),
+          also_shortlisted_for: (overlap.get(flatmate.id) ?? []).map((o) => `${o.customer_name} (enquiry #${o.enquiry_id})`),
         })),
+        note: "Only available (unmatched) profiles are returned. A profile can sit on several shortlists until one enquiry accepts it.",
         next_step: results.length ? "Call shortlist_flatmate with the enquiry_id and chosen flatmate_ids to save them." : "No matches — try strict=false or widen locality/budget.",
       };
     }),
@@ -202,7 +206,8 @@ export function buildMcpServer(baseUrl: string) {
     },
     run(async ({ flatmate_id, enquiry_id }) => {
       const f = await getFlatmate(flatmate_id);
-      const out: Record<string, unknown> = { flatmate: flatmateView(f) };
+      const others = await otherShortlists([f.id], enquiry_id);
+      const out: Record<string, unknown> = { flatmate: flatmateView(f), shortlisted_for_other_enquiries: (others.get(f.id) ?? []).map((o) => `${o.customer_name} (enquiry #${o.enquiry_id})`) };
       if (enquiry_id) {
         const m = scoreFlatmate(f, enquiryCriteria(await getEnquiry(enquiry_id)));
         out.compatibility = { score: m.score, meets_all_criteria: m.meets_all_criteria, breakdown: m.breakdown };
@@ -245,6 +250,7 @@ export function buildMcpServer(baseUrl: string) {
           flatmate_id: r.flatmate_id, name: r.name, label: r.is_demo ? DEMO_NOTE : undefined, occupation: r.occupation,
           locality: r.locality, city: r.city, budget: `${inr(r.budget_min)}–${inr(r.budget_max)}`, move_in_date: r.move_in_date,
           food: r.food, score: r.score, reason: r.reason, status: r.status, note: r.note, added_via: r.source,
+          availability: r.status === "accepted" ? "matched with this enquiry" : r.flatmate_status === "active" ? "available" : "matched with another enquiry",
         })),
       };
     }),
@@ -254,11 +260,16 @@ export function buildMcpServer(baseUrl: string) {
     "update_enquiry_status",
     {
       title: "Update enquiry status",
-      description: `Move an enquiry through the pipeline. Statuses: ${ENQUIRY_STATUS.join(" → ")}. Optional note is appended to the enquiry notes.`,
-      inputSchema: { enquiry_id: z.number().int().positive(), status: z.enum(ENQUIRY_STATUS), note: z.string().max(500).optional() },
+      description: `Move an enquiry through the pipeline. Statuses: ${ENQUIRY_STATUS.join(" → ")}. Optional note is appended to the enquiry notes. When the customer has agreed to live with a specific flatmate, use status 'matched' with matched_flatmate_id: that flatmate is marked matched and removed from every other enquiry's search results. Moving a matched enquiry back to another status releases the flatmate again.`,
+      inputSchema: {
+        enquiry_id: z.number().int().positive(),
+        status: z.enum(ENQUIRY_STATUS),
+        note: z.string().max(500).optional(),
+        matched_flatmate_id: z.number().int().positive().optional().describe("With status 'matched': the flatmate the customer is moving in with"),
+      },
     },
-    run(async ({ enquiry_id, status, note }) => {
-      const e = await updateEnquiryStatus(enquiry_id, status, "claude", note);
+    run(async ({ enquiry_id, status, note, matched_flatmate_id }) => {
+      const e = await updateEnquiryStatus(enquiry_id, status, "claude", note, matched_flatmate_id);
       return { message: `Enquiry #${e.id} is now '${e.status}'.`, enquiry: enquiryView(e, baseUrl) };
     }),
   );
