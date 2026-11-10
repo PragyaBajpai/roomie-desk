@@ -22,9 +22,13 @@ The brief's format is 5 sections and 5:00 maximum; longer videos aren't watched.
 
 ## 2 · Your best work (0:25)
 
-Pick one. The brief asks for **numbers or proof**, so fill in the bracket with a real figure before recording.
+Every fact here is true and checkable. Don't add numbers you can't back up in an interview.
 
-*"The thing I'm proudest of: at Linarc I led Schedule of Values, the billing backbone for construction projects, along with the DocuSign and QuickBooks integrations around it. Contractors went from spreadsheets and re-keying to sign-and-sync inside the product. **[Add proof: e.g. "used by N customers", "cut billing prep from X days to Y", "N contracts signed in the first quarter"].**"*
+*"The thing I'm proudest of is at Linarc. I led Schedule of Values, the billing backbone of a construction project, end to end, and connected it to two systems contractors already lived in: DocuSign for signing and QuickBooks for accounting. Contractors could take a project's billing from schedule to signed contract to synced invoice without leaving the product, where before it meant spreadsheets and re-typing.*
+
+*And the most recent proof is the product you're about to see: I took Roomie Desk from idea to live in under 24 hours, with eight working Claude tools, a real database, and automated tests on every flow."*
+
+> **If you can find a real figure** (your CV, an old sprint report, a LinkedIn post), drop it into the Linarc sentence. For example: *"…rolled out to [N] customer accounts"* or *"…cut billing prep from [X] to [Y]"*. If not, use the script as written.
 
 ## 3 · Why this business will win (0:55)
 
@@ -73,7 +77,6 @@ Pick one. The brief asks for **numbers or proof**, so fill in the bracket with a
 ---
 
 ### Recording checklist
-- [ ] Filled in the number in section 2
 - [ ] Reset demo data right before recording
 - [ ] Throwaway prompt run, so tool permissions are already approved
 - [ ] One full dry run with a timer: under 4:50
