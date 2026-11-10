@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Nav } from "@/components/nav";
 import { logout } from "@/app/actions";
+import { ResetDemo } from "@/components/reset-demo";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="rounded-xl border border-line bg-white p-3">
             <p className="text-[12px] font-medium text-ink-900">Demo workspace</p>
             <p className="text-[11.5px] text-ink-500 mt-0.5 leading-snug">All flatmate profiles here are fictional sample data.</p>
+            <ResetDemo />
           </div>
           <form action={logout}><button className="text-[12.5px] text-ink-500 hover:text-ink-950">Sign out</button></form>
         </div>

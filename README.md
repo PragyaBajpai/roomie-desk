@@ -80,7 +80,7 @@ Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS · Postgre
 5. **Deploy.** Open `https://<your-app>.vercel.app/api/health` → `{"ok":true,"database":"connected",…}`.
 
 ### Database setup
-Nothing to run by hand. On the first request the app creates its tables (`lib/schema.ts`, idempotent, guarded by a Postgres advisory lock) and loads the fictional demo data once (`lib/seed.ts`: 12 flatmates, 3 enquiries). To reset the demo, drop the tables (`DROP TABLE shortlists, activities, enquiries, flatmates, app_meta;`) and hit any page.
+Nothing to run by hand. On the first request the app creates its tables (`lib/schema.ts`, idempotent, guarded by a Postgres advisory lock) and loads the fictional demo data once (`lib/seed.ts`: 12 flatmates, 3 enquiries). To reset the demo, sign in and click **Reset demo data** in the sidebar (restores the original fictional data; all changes and customer links are replaced).
 
 ### Environment variables
 

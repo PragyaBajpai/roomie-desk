@@ -37,7 +37,7 @@ export function ensureReady(): Promise<void> {
   return g.__roomieReady;
 }
 
-async function migrateAndSeed() {
+async function migrateAndSeed(opts: { reset?: boolean } = {}) {
   // One transaction with a transaction-scoped lock: safe behind PgBouncer-style
   // poolers (Neon), where session-level advisory locks can leak.
   const client = await pool().connect();
@@ -45,6 +45,10 @@ async function migrateAndSeed() {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(424242)");
     await client.query(SCHEMA_SQL);
+    if (opts.reset) {
+      await client.query("TRUNCATE shortlists, activities, enquiries, flatmates RESTART IDENTITY CASCADE");
+      await client.query("DELETE FROM app_meta WHERE key = 'seeded'");
+    }
     const { rows } = await client.query("SELECT value FROM app_meta WHERE key = 'seeded'");
     if (rows.length === 0) {
       await seed(client);
@@ -60,6 +64,12 @@ async function migrateAndSeed() {
   } finally {
     client.release();
   }
+}
+
+/** Wipes all data and reloads the original fictional demo workspace. */
+export async function resetDemoData() {
+  await ensureReady();
+  await migrateAndSeed({ reset: true });
 }
 
 async function seed(c: PoolClient) {

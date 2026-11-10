@@ -21,6 +21,13 @@ export async function login(_: FormState, fd: FormData): Promise<FormState> {
   redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
 }
 
+export async function resetDemoAction() {
+  const { resetDemoData } = await import("@/lib/db");
+  await resetDemoData();
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
 export async function logout() {
   (await cookies()).delete(SESSION_COOKIE);
   redirect("/login");
