@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { q, q1, ensureReady } from "./db";
+import { q, q1, ensureReady, newToken } from "./db";
 import { type Criteria, type Flatmate, rankFlatmates, scoreFlatmate } from "./matching";
 import { EnquiryCreate, EnquiryPatch, ENQUIRY_STATUS, SHORTLIST_STATUS, firstError } from "./validation";
 
-export type Source = "web" | "claude";
+export type Source = "web" | "claude" | "customer";
+const decidedBy = (s: Source) => (s === "customer" ? "customer" : "agency");
 
 export class AppError extends Error {
   constructor(message: string, public code: "not_found" | "invalid" = "invalid") {
@@ -26,7 +27,7 @@ export type Enquiry = {
   id: number; customer_name: string; customer_phone: string; gender: string | null; preferred_flatmate_gender: string;
   occupation: string; city: string | null; locality: string | null; budget_min: number | null; budget_max: number | null;
   move_in_by: string | null; food: string | null; smoking: string | null; drinking: string | null; lifestyle: string[];
-  notes: string; status: string; is_demo: boolean; source: string; created_at: Date; updated_at: Date; shortlist_count?: number;
+  notes: string; status: string; is_demo: boolean; source: string; access_token: string; created_at: Date; updated_at: Date; shortlist_count?: number;
 };
 
 const ENQ_COLS = ["customer_name", "customer_phone", "gender", "preferred_flatmate_gender", "occupation", "city", "locality", "budget_min", "budget_max", "move_in_by", "food", "smoking", "drinking", "lifestyle", "notes"] as const;
@@ -63,8 +64,8 @@ export async function createEnquiry(input: unknown, source: Source) {
   const row = { ...d, preferred_flatmate_gender: pref, customer_phone: d.customer_phone ?? "", occupation: d.occupation ?? "", lifestyle: d.lifestyle ?? [], notes: d.notes ?? "" } as Record<string, unknown>;
   const vals = ENQ_COLS.map((k) => row[k] ?? null);
   const e = await q1<Enquiry>(
-    `INSERT INTO enquiries (${ENQ_COLS.join(",")}, source) VALUES (${ENQ_COLS.map((_, i) => "$" + (i + 1)).join(",")}, $${ENQ_COLS.length + 1}) RETURNING *`,
-    [...vals, source]);
+    `INSERT INTO enquiries (${ENQ_COLS.join(",")}, source, access_token) VALUES (${ENQ_COLS.map((_, i) => "$" + (i + 1)).join(",")}, $${ENQ_COLS.length + 1}, $${ENQ_COLS.length + 2}) RETURNING *`,
+    [...vals, source, newToken()]);
   await log(`New enquiry from ${e!.customer_name}${e!.locality ? ` — ${e!.locality}` : ""}${e!.city ? `, ${e!.city}` : ""}`, source, e!.id);
   return e!;
 }
@@ -126,13 +127,13 @@ export async function matchesForEnquiry(id: number, limit = 10) {
 export type ShortlistRow = {
   id: number; enquiry_id: number; flatmate_id: number; score: number; reason: string; note: string; status: string; source: string;
   created_at: Date; name: string; occupation: string; gender: string; locality: string; city: string; budget_min: number;
-  budget_max: number; move_in_date: string; food: string; lifestyle: string[]; is_demo: boolean; flatmate_status: string; matched_with: string | null;
+  budget_max: number; move_in_date: string; food: string; lifestyle: string[]; is_demo: boolean; flatmate_status: string; matched_with: string | null; decided_by: string | null; decided_at: Date | null; intro: string;
 };
 
 export async function getShortlist(enquiryId: number) {
   await getEnquiry(enquiryId);
   return q<ShortlistRow>(
-    `SELECT s.*, f.name, f.occupation, f.gender, f.locality, f.city, f.budget_min, f.budget_max, f.move_in_date, f.food, f.lifestyle, f.is_demo, f.status AS flatmate_status,
+    `SELECT s.*, f.name, f.intro, f.occupation, f.gender, f.locality, f.city, f.budget_min, f.budget_max, f.move_in_date, f.food, f.lifestyle, f.is_demo, f.status AS flatmate_status,
        (SELECT e2.customer_name FROM shortlists s2 JOIN enquiries e2 ON e2.id = s2.enquiry_id
         WHERE s2.flatmate_id = s.flatmate_id AND s2.status = 'accepted' AND s2.enquiry_id <> s.enquiry_id LIMIT 1) AS matched_with
      FROM shortlists s JOIN flatmates f ON f.id = s.flatmate_id WHERE s.enquiry_id = $1 ORDER BY (s.status = 'accepted') DESC, s.score DESC, s.id`, [enquiryId]);
@@ -184,11 +185,18 @@ export async function updateShortlistEntry(enquiryId: number, flatmateId: number
       await acceptShortlisted(enquiryId, flatmateId, source);
       return;
     }
-    await q("UPDATE shortlists SET status = $3, updated_at = now() WHERE enquiry_id = $1 AND flatmate_id = $2", [enquiryId, flatmateId, patch.status]);
+    const by = patch.status === "declined" ? decidedBy(source) : null;
+    await q("UPDATE shortlists SET status = $3, decided_by = $4, decided_at = CASE WHEN $4::text IS NULL THEN NULL ELSE now() END, updated_at = now() WHERE enquiry_id = $1 AND flatmate_id = $2",
+      [enquiryId, flatmateId, patch.status, by]);
     if (prev.status === "accepted") await releaseFlatmate(flatmateId, enquiryId, source, prev.name);
   }
   await q("UPDATE enquiries SET updated_at = now() WHERE id = $1", [enquiryId]);
-  if (patch.status && patch.status !== prev.status) await log(`Shortlist: ${prev.name} → ${patch.status}`, source, enquiryId);
+  if (patch.status && patch.status !== prev.status) {
+    const e = await getEnquiry(enquiryId);
+    await log(source === "customer" && patch.status === "declined"
+      ? `${e.customer_name} passed on ${prev.name} via their private link`
+      : `Shortlist: ${prev.name} → ${patch.status}${patch.status === "declined" ? " (recorded by agency)" : ""}`, source, enquiryId);
+  }
   else if (patch.note !== undefined) await log(`Shortlist note updated for ${prev.name}`, source, enquiryId);
 }
 
@@ -200,10 +208,15 @@ async function acceptShortlisted(enquiryId: number, flatmateId: number, source: 
     `SELECT e.customer_name FROM shortlists s JOIN enquiries e ON e.id = s.enquiry_id
      WHERE s.flatmate_id = $1 AND s.status = 'accepted' AND s.enquiry_id <> $2 LIMIT 1`, [flatmateId, enquiryId]);
   if (elsewhere) throw new AppError(`${f.name} is already matched with ${elsewhere.customer_name}`);
-  await q("UPDATE shortlists SET status = 'accepted', updated_at = now() WHERE enquiry_id = $1 AND flatmate_id = $2", [enquiryId, flatmateId]);
+  const own = await q1<{ name: string }>(
+    `SELECT f.name FROM shortlists s JOIN flatmates f ON f.id = s.flatmate_id WHERE s.enquiry_id = $1 AND s.status = 'accepted' AND s.flatmate_id <> $2 LIMIT 1`, [enquiryId, flatmateId]);
+  if (own) throw new AppError(`${e.customer_name} has already accepted ${own.name}. Change that first.`);
+  await q("UPDATE shortlists SET status = 'accepted', decided_by = $3, decided_at = now(), updated_at = now() WHERE enquiry_id = $1 AND flatmate_id = $2", [enquiryId, flatmateId, decidedBy(source)]);
   await q("UPDATE flatmates SET status = 'matched', updated_at = now() WHERE id = $1", [flatmateId]);
   await q("UPDATE enquiries SET status = 'matched', updated_at = now() WHERE id = $1", [enquiryId]);
-  await log(`${e.customer_name} matched with ${f.name} — ${f.name} removed from the matching pool`, source, enquiryId);
+  await log(source === "customer"
+    ? `${e.customer_name} accepted ${f.name} via their private link — matched`
+    : `${e.customer_name} matched with ${f.name} (confirmed by agency)`, source, enquiryId);
 }
 
 async function releaseFlatmate(flatmateId: number, enquiryId: number, source: Source, name: string) {
@@ -215,9 +228,23 @@ async function releaseFlatmate(flatmateId: number, enquiryId: number, source: So
 
 async function releaseAccepted(enquiryId: number, source: Source) {
   const rows = await q<{ flatmate_id: number; name: string }>(
-    `UPDATE shortlists s SET status = 'shortlisted', updated_at = now() FROM flatmates f
+    `UPDATE shortlists s SET status = 'shortlisted', decided_by = NULL, decided_at = NULL, updated_at = now() FROM flatmates f
      WHERE s.enquiry_id = $1 AND s.status = 'accepted' AND f.id = s.flatmate_id RETURNING s.flatmate_id, f.name`, [enquiryId]);
   for (const r of rows) await releaseFlatmate(r.flatmate_id, enquiryId, source, r.name);
+}
+
+// ---------------- Customer private link ----------------
+export async function getEnquiryByToken(token: string) {
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return null;
+  return q1<Enquiry>("SELECT * FROM enquiries WHERE access_token = $1", [token]);
+}
+
+/** The customer accepts or passes on one of their shortlisted profiles. */
+export async function customerDecision(token: string, flatmateId: number, decision: "accept" | "decline") {
+  const e = await getEnquiryByToken(token);
+  if (!e) throw new AppError("This link is not valid", "not_found");
+  if (e.status === "closed") throw new AppError("This enquiry is closed. Please contact the agency.");
+  await updateShortlistEntry(e.id, flatmateId, { status: decision === "accept" ? "accepted" : "declined" }, "customer");
 }
 
 /** Open enquiries (other than `excludeEnquiryId`) each flatmate is currently shortlisted for. */

@@ -70,5 +70,11 @@ CREATE TABLE IF NOT EXISTS activities (
 );
 
 CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- v2: customer private links + who made each decision
+ALTER TABLE enquiries ADD COLUMN IF NOT EXISTS access_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_enquiries_token ON enquiries (access_token);
+ALTER TABLE shortlists ADD COLUMN IF NOT EXISTS decided_by TEXT CHECK (decided_by IN ('customer','agency'));
+ALTER TABLE shortlists ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_activities_created ON activities (created_at DESC);
 `;

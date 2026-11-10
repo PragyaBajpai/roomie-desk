@@ -53,7 +53,7 @@ export function EnquiryForm({ enquiry = {}, action, submitLabel }: { enquiry?: E
         </Field>
         {enquiry.status && (
           <Field label="Enquiry status">
-            <select name="status" defaultValue={enquiry.status} className="input capitalize">
+            <select key={enquiry.status} name="status" defaultValue={enquiry.status} className="input capitalize">
               {ENQUIRY_STATUS.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
             </select>
           </Field>

@@ -20,6 +20,7 @@ The owner can run that whole loop by talking to Claude (through a remote MCP ser
 | **Enquiries** | List with status filters; create; full edit & save of customer name, phone, budget, location, move-in date, food/smoking/drinking, lifestyle preferences, notes and status. Shortlist follow-up status + notes per profile. |
 | **Matching workspace** | Pick an open enquiry, see ranked flatmate profiles with a 0–100 score and a per-criterion breakdown, shortlist / un-shortlist with one click. |
 | **Connect Claude** | The MCP URL with copy button, setup steps and sample prompts. |
+| **Customer link** (`/c/<token>`) | No login. The customer sees only their own requirements and shortlist (no internal notes, phone or other customers) and can **Accept** or **Not for me**. |
 
 ### Matching (deterministic — no AI in the app)
 `lib/matching.ts`. Hard filters first (active profile, flatmate gender, city, and the flatmate's own gender preference must accept the seeker), then:
@@ -33,6 +34,12 @@ The owner can run that whole loop by talking to Claude (through a remote MCP ser
 | Lifestyle | 15 | 5 smoking + 5 drinking + 5 lifestyle-tag overlap | Clashes (early-riser vs night-owl) deduct |
 
 Every result carries a plain-English reason per criterion, which is what Claude reads back to the user.
+
+### Who decides a match
+- **Admin (agency):** one login, sees and edits everything. Each enquiry has a private **customer link** to send on WhatsApp; Claude's `get_enquiry`/`create_enquiry` return it as `customer_link`.
+- **Customer:** opens the link and accepts or passes. Recorded as **Accepted by customer** / **Declined by customer**.
+- If the customer confirms by phone, the admin (or Claude via `update_enquiry_status` + `matched_flatmate_id`) can record it — always labelled **Confirmed by agency**, on the admin view, the customer's page and in MCP results.
+- One accepted match per enquiry. No customer registration or passwords — the link is a random 24-character token.
 
 ### Matched profiles leave the pool
 A shortlist doesn't reserve anyone — the same profile can be sent to several seekers, and match cards show **"Also shortlisted for …"** so you can see the overlap. When a customer agrees, set that shortlist entry to **Accepted** (or tell Claude "mark Neha as matched with Priya"): the enquiry becomes *matched*, the flatmate becomes *matched*, and they disappear from every other enquiry's results and can't be shortlisted elsewhere. Moving the entry or the enquiry back releases them.

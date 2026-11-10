@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { baseUrlFrom, customerLink } from "@/lib/url";
+import { CopyField } from "@/components/copy";
 import { notFound } from "next/navigation";
 import { AppError, getEnquiry, getShortlist } from "@/lib/repo";
 import { EnquiryForm } from "@/components/enquiry-form";
@@ -16,6 +19,8 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
     if (e instanceof AppError && e.code === "not_found") notFound();
     throw e;
   }
+
+  const link = customerLink(baseUrlFrom(await headers()), enquiry.access_token);
 
   return (
     <>
@@ -35,7 +40,15 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
       </div>
 
       <div className="grid xl:grid-cols-[1fr_380px] gap-5 items-start">
-        <EnquiryForm key={enquiry.status} enquiry={enquiry} action={saveEnquiryAction} submitLabel="Save changes" />
+        <EnquiryForm enquiry={enquiry} action={saveEnquiryAction} submitLabel="Save changes" />
+
+        <div className="space-y-4">
+        <section className="card p-5">
+          <h2 className="text-[15px] font-semibold">Customer link</h2>
+          <p className="text-[12.5px] text-ink-500 mt-0.5 mb-3">Send this private link to {enquiry.customer_name.replace(/^.*—\s*/, "").split(" ")[0]} (e.g. on WhatsApp). They see only their own shortlist and can accept or pass.</p>
+          <CopyField value={link} />
+          <a href={link} target="_blank" className="inline-block text-[12.5px] text-ink-500 hover:text-ink-950 mt-2">Preview as customer ↗</a>
+        </section>
 
         <section className="card">
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line">
@@ -58,7 +71,8 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
                       <p className="font-medium text-ink-950">{s.name}</p>
                       {s.is_demo && <DemoBadge />}
                       {s.source === "claude" && <SourceBadge source="claude" />}
-                      {s.status === "accepted" && <span className="chip bg-sage-50 text-sage-700">Matched</span>}
+                      {s.status === "accepted" && <span className="chip bg-sage-50 text-sage-700">{s.decided_by === "customer" ? "Accepted by customer" : "Confirmed by agency"}</span>}
+                      {s.status === "declined" && <span className="chip bg-ink-950/5 text-ink-500">{s.decided_by === "customer" ? "Declined by customer" : "Declined (recorded by agency)"}</span>}
                       {s.matched_with && <span className="chip bg-ink-950/5 text-ink-500">Unavailable</span>}
                     </div>
                     <p className="text-[12px] text-ink-500">{s.occupation} · {s.locality}</p>
@@ -76,12 +90,13 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
                     </form>
                   </div>
                 ) : (
-                  <ShortlistEntryEditor enquiryId={enquiry.id} flatmateId={s.flatmate_id} status={s.status} note={s.note} />
+                  <ShortlistEntryEditor key={`${s.status}-${s.decided_by}`} enquiryId={enquiry.id} flatmateId={s.flatmate_id} status={s.status} note={s.note} decidedBy={s.decided_by} />
                 )}
               </li>
             ))}
           </ul>
         </section>
+        </div>
       </div>
     </>
   );

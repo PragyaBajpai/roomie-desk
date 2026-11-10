@@ -28,6 +28,8 @@ const { enquiry } = await call("create_enquiry", {
   locality: "Hinjewadi Phase 1", budget_max: 12000, move_in_by: "2026-12-01", food: "vegetarian",
 });
 ok(`create_enquiry → #${enquiry.id} (${enquiry.open_in_roomie_desk})`);
+if (!/\/c\/[A-Za-z0-9_-]{16,}$/.test(enquiry.customer_link)) throw new Error("missing customer_link");
+ok("enquiry has a private customer link");
 
 const search = await call("search_flatmates", { enquiry_id: enquiry.id, limit: 3 });
 console.log("  Top 3:");
@@ -74,7 +76,9 @@ ok("search shows a profile is also shortlisted for another enquiry");
 const matched = await call("update_enquiry_status", { enquiry_id: enquiry.id, status: "matched", matched_flatmate_id: ids[0], note: "Moving in together" });
 if (matched.enquiry.status !== "matched") throw new Error("match failed");
 const sl2 = await call("get_shortlisted_flatmates", { enquiry_id: enquiry.id });
-if (sl2.shortlist.find((r) => r.flatmate_id === ids[0]).status !== "accepted") throw new Error("not accepted");
+const acc = sl2.shortlist.find((r) => r.flatmate_id === ids[0]);
+if (acc.status !== "accepted" || !acc.decided_by?.startsWith("agency")) throw new Error("not accepted by agency");
+ok("agency confirmation is labelled: " + acc.decided_by);
 ok(`matched enquiry with flatmate #${ids[0]}`);
 const after = await call("search_flatmates", { enquiry_id: second.id, limit: 10 });
 if (after.results.some((r) => r.id === ids[0])) throw new Error("matched flatmate still in other results");

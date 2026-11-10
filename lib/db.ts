@@ -1,4 +1,5 @@
 import { Pool, type PoolClient, types } from "pg";
+import { randomBytes } from "crypto";
 import { SCHEMA_SQL } from "./schema";
 import { DEMO_ENQUIRIES, DEMO_FLATMATES } from "./seed";
 
@@ -49,6 +50,9 @@ async function migrateAndSeed() {
       await seed(client);
       await client.query("INSERT INTO app_meta (key, value) VALUES ('seeded', now()::text)");
     }
+    // Give every enquiry an unguessable private customer link.
+    const missing = await client.query("SELECT id FROM enquiries WHERE access_token IS NULL");
+    for (const r of missing.rows) await client.query("UPDATE enquiries SET access_token = $2 WHERE id = $1", [r.id, newToken()]);
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
@@ -97,6 +101,10 @@ async function seed(c: PoolClient) {
   for (const [message, eid] of acts) {
     await c.query("INSERT INTO activities (message, source, enquiry_id) VALUES ($1,'web',$2)", [message, eid]);
   }
+}
+
+export function newToken() {
+  return randomBytes(18).toString("base64url");
 }
 
 export async function q<T = any>(text: string, params: unknown[] = []): Promise<T[]> {

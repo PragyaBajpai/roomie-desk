@@ -78,12 +78,12 @@ export default async function DashboardPage() {
             <ol className="space-y-3">
               {d.activity.map((a) => (
                 <li key={a.id} className="flex gap-3 text-[13px]">
-                  <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${a.source === "claude" ? "bg-[#C2683C]" : "bg-ink-300"}`} />
+                  <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${a.source === "claude" ? "bg-[#C2683C]" : a.source === "customer" ? "bg-sage-500" : "bg-ink-300"}`} />
                   <div className="min-w-0">
                     <p className="text-ink-900 leading-snug">
                       {a.enquiry_id ? <Link href={`/enquiries/${a.enquiry_id}`} className="hover:underline">{a.message}</Link> : a.message}
                     </p>
-                    <p className="text-[11.5px] text-ink-400 mt-0.5">{a.source === "claude" ? "via Claude · " : ""}{timeAgo(a.created_at)}</p>
+                    <p className="text-[11.5px] text-ink-400 mt-0.5">{a.source === "claude" ? "via Claude · " : a.source === "customer" ? "by customer · " : ""}{timeAgo(a.created_at)}</p>
                   </div>
                 </li>
               ))}

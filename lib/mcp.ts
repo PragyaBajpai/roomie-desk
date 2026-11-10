@@ -47,6 +47,8 @@ function enquiryView(e: Enquiry, base: string) {
     created_via: e.source,
     updated_at: e.updated_at,
     open_in_roomie_desk: `${base}/enquiries/${e.id}`,
+    customer_link: `${base}/c/${e.access_token}`,
+    customer_link_note: "Private link for the customer: they see only their own shortlist and can accept or pass. Share it with the customer, not publicly.",
   };
 }
 
@@ -97,7 +99,7 @@ export function buildMcpServer(baseUrl: string) {
     { name: "roomie-desk", version: "1.0.0" },
     {
       instructions:
-        "Roomie Desk is the enquiry and flatmate-matching back office of a co-living agency. Typical flow: create_enquiry → search_flatmates (pass enquiry_id) → present the top matches with their score breakdown → shortlist_flatmate. When the customer agrees to a flatmate, call update_enquiry_status with status 'matched' and matched_flatmate_id — that removes the flatmate from everyone else's results. All flatmate profiles in this workspace are fictional demo data; say so when presenting them. Scores are deterministic (budget 30, location 25, move-in 20, food 10, lifestyle 15).",
+        "Roomie Desk is the enquiry and flatmate-matching back office of a co-living agency. Typical flow: create_enquiry → search_flatmates (pass enquiry_id) → present the top matches with their score breakdown → shortlist_flatmate. Each enquiry has a private customer_link: share it so the customer can accept or pass on their shortlist themselves. Only if the customer explicitly confirmed to the agency, call update_enquiry_status with status 'matched' and matched_flatmate_id (recorded as 'confirmed by agency'). All flatmate profiles in this workspace are fictional demo data; say so when presenting them. Scores are deterministic (budget 30, location 25, move-in 20, food 10, lifestyle 15).",
     },
   );
 
@@ -138,7 +140,7 @@ export function buildMcpServer(baseUrl: string) {
     run(async ({ enquiry_id }) => {
       const e = await getEnquiry(enquiry_id);
       const s = await getShortlist(enquiry_id);
-      return { enquiry: enquiryView(e, baseUrl), shortlist: s.map((r) => ({ flatmate_id: r.flatmate_id, name: r.name, score: r.score, status: r.status, note: r.note })) };
+      return { enquiry: enquiryView(e, baseUrl), shortlist: s.map((r) => ({ flatmate_id: r.flatmate_id, name: r.name, score: r.score, status: r.status, decided_by: r.decided_by, note: r.note })) };
     }),
   );
 
@@ -250,6 +252,7 @@ export function buildMcpServer(baseUrl: string) {
           flatmate_id: r.flatmate_id, name: r.name, label: r.is_demo ? DEMO_NOTE : undefined, occupation: r.occupation,
           locality: r.locality, city: r.city, budget: `${inr(r.budget_min)}–${inr(r.budget_max)}`, move_in_date: r.move_in_date,
           food: r.food, score: r.score, reason: r.reason, status: r.status, note: r.note, added_via: r.source,
+          decided_by: r.decided_by === "customer" ? "customer (via private link)" : r.decided_by === "agency" ? "agency on the customer's behalf" : null,
           availability: r.status === "accepted" ? "matched with this enquiry" : r.matched_with ? `unavailable — matched with ${r.matched_with}` : "available",
         })),
       };
@@ -260,7 +263,7 @@ export function buildMcpServer(baseUrl: string) {
     "update_enquiry_status",
     {
       title: "Update enquiry status",
-      description: `Move an enquiry through the pipeline. Statuses: ${ENQUIRY_STATUS.join(" → ")}. Optional note is appended to the enquiry notes. When the customer has agreed to live with a specific flatmate, use status 'matched' with matched_flatmate_id: that flatmate is marked matched and removed from every other enquiry's search results. Moving a matched enquiry back to another status releases the flatmate again.`,
+      description: `Move an enquiry through the pipeline. Statuses: ${ENQUIRY_STATUS.join(" → ")}. Optional note is appended to the enquiry notes. Customers normally accept matches themselves through their private customer_link. Only if the customer has explicitly confirmed to the agency, use status 'matched' with matched_flatmate_id — this is recorded as 'confirmed by agency'; the flatmate is marked matched and removed from every other enquiry's search results. Moving a matched enquiry back to another status releases the flatmate again.`,
       inputSchema: {
         enquiry_id: z.number().int().positive(),
         status: z.enum(ENQUIRY_STATUS),
