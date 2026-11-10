@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; }
+  body { @apply bg-canvas text-ink-900 font-sans text-[14px]; font-feature-settings: "cv11", "ss01"; }
+  h1, h2, h3 { @apply font-display tracking-tight text-ink-950; }
+}
+
+@layer components {
+  .card { @apply bg-white rounded-xl2 border border-line shadow-card; }
+  .btn { @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 h-9 text-[13px] font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap; }
+  .btn-primary { @apply btn bg-ink-950 text-white hover:bg-ink-700; }
+  .btn-brand { @apply btn bg-brand-500 text-white hover:bg-brand-600; }
+  .btn-ghost { @apply btn text-ink-700 hover:bg-ink-950/5; }
+  .btn-outline { @apply btn border border-line bg-white text-ink-900 hover:bg-canvas; }
+  .btn-sm { @apply h-8 px-2.5 text-[12.5px]; }
+  .label { @apply block text-[12px] font-medium text-ink-500 mb-1.5; }
+  .input { @apply w-full h-9 rounded-lg border border-line bg-white px-3 text-[13.5px] text-ink-950 placeholder:text-ink-300 outline-none transition focus:border-ink-300 focus:ring-4 focus:ring-ink-950/5; }
+  textarea.input { @apply h-auto py-2 leading-relaxed; }
+  select.input { @apply pr-8; }
+  .chip { @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] font-medium; }
+  .th { @apply text-left text-[11.5px] font-medium uppercase tracking-wide text-ink-400 px-4 py-2.5; }
+  .td { @apply px-4 py-3 border-t border-line align-middle; }
+}
