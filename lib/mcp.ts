@@ -250,7 +250,7 @@ export function buildMcpServer(baseUrl: string) {
           flatmate_id: r.flatmate_id, name: r.name, label: r.is_demo ? DEMO_NOTE : undefined, occupation: r.occupation,
           locality: r.locality, city: r.city, budget: `${inr(r.budget_min)}–${inr(r.budget_max)}`, move_in_date: r.move_in_date,
           food: r.food, score: r.score, reason: r.reason, status: r.status, note: r.note, added_via: r.source,
-          availability: r.status === "accepted" ? "matched with this enquiry" : r.flatmate_status === "active" ? "available" : "matched with another enquiry",
+          availability: r.status === "accepted" ? "matched with this enquiry" : r.matched_with ? `unavailable — matched with ${r.matched_with}` : "available",
         })),
       };
     }),

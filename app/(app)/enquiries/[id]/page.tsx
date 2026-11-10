@@ -4,7 +4,7 @@ import { AppError, getEnquiry, getShortlist } from "@/lib/repo";
 import { EnquiryForm } from "@/components/enquiry-form";
 import { ShortlistEntryEditor } from "@/components/shortlist-entry";
 import { Avatar, DemoBadge, ScoreRing, SourceBadge, StatusBadge, budgetText, dateText, timeAgo } from "@/components/ui";
-import { saveEnquiryAction } from "@/app/actions";
+import { saveEnquiryAction, unshortlistAction } from "@/app/actions";
 
 export default async function EnquiryPage({ params }: { params: Promise<{ id: string }> }) {
   const id = Number((await params).id);
@@ -50,7 +50,7 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
           )}
           <ul>
             {shortlist.map((s) => (
-              <li key={s.id} className={`px-5 py-4 border-b border-line last:border-0 ${s.status === "accepted" ? "bg-sage-50/60" : ""}`}>
+              <li key={s.id} className={`px-5 py-4 border-b border-line last:border-0 ${s.status === "accepted" ? "bg-sage-50/60" : ""} ${s.matched_with ? "opacity-60" : ""}`}>
                 <div className="flex gap-3">
                   <Avatar name={s.name} />
                   <div className="flex-1 min-w-0">
@@ -59,14 +59,25 @@ export default async function EnquiryPage({ params }: { params: Promise<{ id: st
                       {s.is_demo && <DemoBadge />}
                       {s.source === "claude" && <SourceBadge source="claude" />}
                       {s.status === "accepted" && <span className="chip bg-sage-50 text-sage-700">Matched</span>}
-                      {s.status !== "accepted" && s.flatmate_status === "matched" && <span className="chip bg-ink-950/5 text-ink-500" title="Accepted by another enquiry">Matched elsewhere</span>}
+                      {s.matched_with && <span className="chip bg-ink-950/5 text-ink-500">Unavailable</span>}
                     </div>
                     <p className="text-[12px] text-ink-500">{s.occupation} · {s.locality}</p>
                   </div>
                   <ScoreRing score={s.score} size={44} />
                 </div>
                 <p className="text-[12px] text-ink-500 mt-2 leading-relaxed">{s.reason}</p>
-                <ShortlistEntryEditor enquiryId={enquiry.id} flatmateId={s.flatmate_id} status={s.status} note={s.note} />
+                {s.matched_with ? (
+                  <div className="mt-3 rounded-lg bg-canvas border border-line px-3 py-2 text-[12.5px] text-ink-500">
+                    Matched with <b className="text-ink-700">{s.matched_with}</b> — no longer available.
+                    <form action={unshortlistAction} className="inline">
+                      <input type="hidden" name="enquiry_id" value={enquiry.id} />
+                      <input type="hidden" name="flatmate_id" value={s.flatmate_id} />
+                      <button className="ml-2 underline hover:text-brand-700">Remove</button>
+                    </form>
+                  </div>
+                ) : (
+                  <ShortlistEntryEditor enquiryId={enquiry.id} flatmateId={s.flatmate_id} status={s.status} note={s.note} />
+                )}
               </li>
             ))}
           </ul>

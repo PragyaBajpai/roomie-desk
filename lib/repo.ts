@@ -126,13 +126,15 @@ export async function matchesForEnquiry(id: number, limit = 10) {
 export type ShortlistRow = {
   id: number; enquiry_id: number; flatmate_id: number; score: number; reason: string; note: string; status: string; source: string;
   created_at: Date; name: string; occupation: string; gender: string; locality: string; city: string; budget_min: number;
-  budget_max: number; move_in_date: string; food: string; lifestyle: string[]; is_demo: boolean; flatmate_status: string;
+  budget_max: number; move_in_date: string; food: string; lifestyle: string[]; is_demo: boolean; flatmate_status: string; matched_with: string | null;
 };
 
 export async function getShortlist(enquiryId: number) {
   await getEnquiry(enquiryId);
   return q<ShortlistRow>(
-    `SELECT s.*, f.name, f.occupation, f.gender, f.locality, f.city, f.budget_min, f.budget_max, f.move_in_date, f.food, f.lifestyle, f.is_demo, f.status AS flatmate_status
+    `SELECT s.*, f.name, f.occupation, f.gender, f.locality, f.city, f.budget_min, f.budget_max, f.move_in_date, f.food, f.lifestyle, f.is_demo, f.status AS flatmate_status,
+       (SELECT e2.customer_name FROM shortlists s2 JOIN enquiries e2 ON e2.id = s2.enquiry_id
+        WHERE s2.flatmate_id = s.flatmate_id AND s2.status = 'accepted' AND s2.enquiry_id <> s.enquiry_id LIMIT 1) AS matched_with
      FROM shortlists s JOIN flatmates f ON f.id = s.flatmate_id WHERE s.enquiry_id = $1 ORDER BY (s.status = 'accepted') DESC, s.score DESC, s.id`, [enquiryId]);
 }
 
