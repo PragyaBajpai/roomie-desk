@@ -60,7 +60,7 @@ Every fact here is true and checkable. Don't add numbers you can't back up in an
 | 1:00 | Open Neha. Change budget to **13,000**, tick **quiet**, status **Contacted**, **Save changes**. Then **refresh the page**. | *"A person can correct anything Claude did. Saved, refreshed, still there: it's in Postgres."* |
 | 1:25 | Copy the **Customer link**, open it in the private window or on your phone. Click **Accept Priya**. | *"This is what Neha sees: no login, only her own matches. She accepts Priya herself."* |
 | 1:40 | Back to admin, refresh: **Accepted by customer**, enquiry **Matched**. Open **Matching** for Riya: Priya is gone. | *"The agency sees who decided, and Priya is off the market for everyone else."* |
-| 1:50 | In Claude: **"What's Neha's status and budget now?"** | *"And Claude sees my manual edit and Neha's decision. Claude, the app, the agency and the customer, all on one record."* |
+| 1:50 | In Claude: **"Check Roomie Desk again: what's Neha's current status, budget and who did she accept?"** | *"And Claude sees my manual edit and Neha's decision. Claude, the app, the agency and the customer, all on one record."* |
 
 ## 5 · The money (0:40)
 
