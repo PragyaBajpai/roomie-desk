@@ -80,7 +80,9 @@ export async function createEnquiry(input: unknown, source: Source) {
 export async function updateEnquiry(id: number, patch: unknown, source: Source) {
   const current = await getEnquiry(id);
   const d = parse(EnquiryPatch, patch) as Record<string, unknown>;
-  const keys = ENQ_COLS.filter((k) => d[k] !== undefined);
+  // Only fields whose value actually changes (the web form submits every field).
+  const norm = (v: unknown) => JSON.stringify(Array.isArray(v) ? [...v].sort() : v === "" || v === undefined ? null : v);
+  const keys = ENQ_COLS.filter((k) => d[k] !== undefined && norm(d[k]) !== norm((current as Record<string, unknown>)[k]));
   const merged = { ...current, ...d } as Enquiry;
   if (merged.budget_min != null && merged.budget_max != null && merged.budget_max < merged.budget_min) throw new AppError("budget_max must be ≥ budget_min");
   if (!keys.length) return current;
