@@ -48,6 +48,13 @@ export async function getEnquiry(id: number) {
   return e;
 }
 
+/** Find enquiries by customer name (case-insensitive, partial), most recently updated first. */
+export async function findEnquiriesByName(name: string) {
+  const term = name.trim();
+  if (term.length < 2) throw new AppError("customer_name must be at least 2 characters");
+  return q<Enquiry>("SELECT * FROM enquiries WHERE customer_name ILIKE $1 ORDER BY updated_at DESC, id DESC LIMIT 10", [`%${term}%`]);
+}
+
 export function enquiryCriteria(e: Enquiry): Criteria & { seekerGender: string | null } {
   return {
     gender: e.preferred_flatmate_gender !== "any" ? e.preferred_flatmate_gender : null,

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
-  AppError, createEnquiry, enquiryCriteria, getEnquiry, getFlatmate, getShortlist, otherShortlists, searchFlatmates,
+  AppError, createEnquiry, enquiryCriteria, findEnquiriesByName, getEnquiry, getFlatmate, getShortlist, otherShortlists, searchFlatmates,
   shortlistFlatmates, updateEnquiry, updateEnquiryStatus, type Enquiry,
 } from "./repo";
 import { scoreFlatmate, type Flatmate } from "./matching";
@@ -99,7 +99,7 @@ export function buildMcpServer(baseUrl: string) {
     { name: "roomie-desk", version: "1.0.0" },
     {
       instructions:
-        "Roomie Desk is the enquiry and flatmate-matching back office of a co-living agency. Typical flow: create_enquiry → search_flatmates (pass enquiry_id) → present the top matches with their score breakdown → shortlist_flatmate. Each enquiry has a private customer_link: share it so the customer can accept or pass on their shortlist themselves. Only if the customer explicitly confirmed to the agency, call update_enquiry_status with status 'matched' and matched_flatmate_id (recorded as 'confirmed by agency'). All flatmate profiles in this workspace are fictional demo data; say so when presenting them. Scores are deterministic (budget 30, location 25, move-in 20, food 10, lifestyle 15).",
+        "Roomie Desk is the enquiry and flatmate-matching back office of a co-living agency. Typical flow: create_enquiry → search_flatmates (pass enquiry_id) → present the top matches with their score breakdown → shortlist_flatmate. Each enquiry has a private customer_link: share it so the customer can accept or pass on their shortlist themselves. Only if the customer explicitly confirmed to the agency, call update_enquiry_status with status 'matched' and matched_flatmate_id (recorded as 'confirmed by agency'). All flatmate profiles in this workspace are fictional demo data; say so when presenting them. Scores are deterministic (budget 30, location 25, move-in 20, food 10, lifestyle 15). Records also change outside this chat (agency edits in the app, customer decisions on their link): whenever asked about an enquiry's current status, budget or shortlist, call get_enquiry again — by customer_name if you don't have the id — instead of reusing earlier results.",
     },
   );
 
@@ -133,14 +133,35 @@ export function buildMcpServer(baseUrl: string) {
     "get_enquiry",
     {
       title: "Get enquiry",
-      description: "Fetch one enquiry with its current shortlist.",
-      inputSchema: { enquiry_id: z.number().int().positive() },
+      description:
+        "Fetch the CURRENT state of one enquiry and its shortlist, by enquiry_id or by customer_name. Records change outside this chat — the agency edits them in the Roomie Desk app and customers accept or pass on their private link — so always call this again for any question about status, budget, preferences or the shortlist; never answer from earlier results.",
+      inputSchema: {
+        enquiry_id: z.number().int().positive().optional(),
+        customer_name: z.string().min(2).optional().describe("Customer name (partial, case-insensitive) when the id isn't known, e.g. 'Neha'"),
+      },
       annotations: { readOnlyHint: true },
     },
-    run(async ({ enquiry_id }) => {
-      const e = await getEnquiry(enquiry_id);
-      const s = await getShortlist(enquiry_id);
-      return { enquiry: enquiryView(e, baseUrl), shortlist: s.map((r) => ({ flatmate_id: r.flatmate_id, name: r.name, score: r.score, status: r.status, decided_by: r.decided_by, note: r.note })) };
+    run(async ({ enquiry_id, customer_name }) => {
+      let id = enquiry_id;
+      if (!id) {
+        if (!customer_name) throw new AppError("Provide enquiry_id or customer_name");
+        const found = await findEnquiriesByName(customer_name);
+        if (found.length === 0) throw new AppError(`No enquiry found for “${customer_name}”`);
+        if (found.length > 1) {
+          return {
+            message: `${found.length} enquiries match “${customer_name}”. Ask which one, or call again with enquiry_id.`,
+            matches: found.map((e) => ({ enquiry_id: e.id, customer_name: e.customer_name, status: e.status, locality: e.locality, city: e.city, updated_at: e.updated_at })),
+          };
+        }
+        id = found[0].id;
+      }
+      const e = await getEnquiry(id);
+      const s = await getShortlist(id);
+      return {
+        as_of: new Date().toISOString(),
+        enquiry: enquiryView(e, baseUrl),
+        shortlist: s.map((r) => ({ flatmate_id: r.flatmate_id, name: r.name, score: r.score, status: r.status, decided_by: r.decided_by, note: r.note })),
+      };
     }),
   );
 
@@ -239,7 +260,7 @@ export function buildMcpServer(baseUrl: string) {
     "get_shortlisted_flatmates",
     {
       title: "Get shortlisted flatmates",
-      description: "List the flatmates shortlisted for an enquiry, with stored scores, reasons, notes and follow-up status.",
+      description: "List the flatmates shortlisted for an enquiry right now, with stored scores, reasons, notes, follow-up status and who decided (customers accept on their private link, so call again rather than relying on earlier results).",
       inputSchema: { enquiry_id: z.number().int().positive() },
       annotations: { readOnlyHint: true },
     },
