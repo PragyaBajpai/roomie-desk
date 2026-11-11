@@ -10,6 +10,17 @@ The owner can run that whole loop by talking to Claude (through a remote MCP ser
 
 > All flatmate profiles in the workspace are **fictional demo data**, labelled "Fictional demo" in the app and in every MCP response.
 
+## Live demo
+
+| | |
+|---|---|
+| **App** | https://roomie-desk.vercel.app |
+| **Login** | `demo@roomie.app` / `Roomie@2026` |
+| **MCP endpoint** | `https://roomie-desk.vercel.app/api/mcp/<MCP_ACCESS_KEY>` (the key is shared privately with reviewers, never committed) |
+| **Health check** | https://roomie-desk.vercel.app/api/health |
+
+Built for the Volopay Product & Tech assignment: *a business that runs on Claude, with no AI inside it.* Claude does the reading and writing through MCP; Roomie Desk stores the records, calculates the matches, lets a person edit everything and serves the customer.
+
 ---
 
 ## What's in the box
@@ -51,7 +62,7 @@ Official `@modelcontextprotocol/sdk`, **Streamable HTTP** (stateless, JSON respo
 |---|---|
 | `create_enquiry` | INSERT enquiry |
 | `update_enquiry` | UPDATE enquiry fields, re-score its shortlist |
-| `get_enquiry` | SELECT enquiry + shortlist |
+| `get_enquiry` | SELECT enquiry + shortlist, by `enquiry_id` or `customer_name` (always fresh: records change outside the chat) |
 | `search_flatmates` | SELECT active profiles → filter → score → rank (by `enquiry_id` or direct criteria) |
 | `get_flatmate_details` | SELECT profile (+ score breakdown against an enquiry) |
 | `shortlist_flatmate` | UPSERT shortlist rows with stored score + reason; enquiry → "shortlisted" |
